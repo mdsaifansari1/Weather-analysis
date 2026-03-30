@@ -1,52 +1,43 @@
 import streamlit as st
 import pandas as pd
 import joblib
+import os
 from datetime import datetime
 
-# 1. Page Configuration & Custom CSS for Advanced UI
+# 1. Page Configuration & Custom CSS
 st.set_page_config(page_title="Weather AI Pro", page_icon="🌤️", layout="centered")
 
-# Custom CSS for Background and Glassmorphism effect
+# Custom CSS for UI
 st.markdown("""
     <style>
-    .main {
-        background-color: #0e1117;
-    }
+    .main { background-color: #0e1117; }
     .stButton>button {
-        width: 100%;
-        border-radius: 20px;
-        height: 3em;
-        background-color: #00acee;
-        color: white;
-        font-weight: bold;
-        border: none;
+        width: 100%; border-radius: 20px; height: 3em;
+        background-color: #00acee; color: white; font-weight: bold; border: none;
     }
-    .stButton>button:hover {
-        background-color: #0078aa;
-        border: none;
-    }
-    .reportview-container .main .block-container {
-        padding-top: 2rem;
-    }
+    .stButton>button:hover { background-color: #0078aa; }
     .prediction-card {
         background: rgba(255, 255, 255, 0.05);
-        border-radius: 15px;
-        padding: 20px;
+        border-radius: 15px; padding: 20px;
         border: 1px solid rgba(255, 255, 255, 0.1);
         text-align: center;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Models Load Karein
+# 2. Models Load Karein (Corrected Paths for Small Models)
 @st.cache_resource
 def load_all_assets():
     try:
-        temp_model = joblib.load('models/weather_rf_model.pkl')
-        rain_model = joblib.load('models/rain_rf_model.pkl')
-        le = joblib.load('models/state_encoder.pkl')
+        # Check karein agar models folder ke andar hain ya bahar
+        model_path = 'models/' if os.path.exists('models') else ''
+        
+        temp_model = joblib.load(f'{model_path}weather_rf_model_small.pkl')
+        rain_model = joblib.load(f'{model_path}rain_model_small.pkl')
+        le = joblib.load(f'{model_path}state_encoder.pkl')
         return temp_model, rain_model, le
-    except:
+    except Exception as e:
+        st.error(f"Error loading models: {e}")
         return None, None, None
 
 model_temp, model_rain, le = load_all_assets()
@@ -55,21 +46,21 @@ model_temp, model_rain, le = load_all_assets()
 st.title("🌤️ AI Weather Analytics")
 st.markdown("---")
 
-if model_temp is None:
-    st.error("Error: Models folder check karein! .pkl files nahi mili.")
+# Model check alert
+if model_temp is None or model_rain is None:
+    st.warning("⚠️ Models load nahi ho paye. Check karein ki GitHub par 'models' folder mein '.pkl' files sahi naam se hain ya nahi.")
+    st.info("Files required: weather_rf_model_small.pkl, rain_model_small.pkl, state_encoder.pkl")
     st.stop()
 
-# 4. Input Section - Minimalist UI
+# 4. Input Section
 with st.container():
     st.subheader("📍 Check Forecast")
-    
     col_state, col_date = st.columns(2)
     
     with col_state:
         state_input = st.selectbox("Select State", options=le.classes_)
     
     with col_date:
-        # User ko Calendar dikhayenge (UX improvement)
         selected_date = st.date_input("Choose Date", datetime.now())
 
 # Prediction Button
@@ -81,12 +72,12 @@ if st.button("🚀 Generate AI Forecast"):
         day = selected_date.day
         year = selected_date.year
         
-        # Logic values (Average placeholders)
+        # Input features logic (Average placeholders for simplicity)
         hour = 12
         humidity, pressure, wind, cloud = 55, 1010, 12, 30
         
         input_features = pd.DataFrame([[year, month, day, hour, state_encoded, humidity, pressure, wind, cloud]], 
-                                       columns=['year', 'month', 'day', 'hour', 'State_Encoded', 'humidity', 'pressure', 'windspeedKmph', 'cloudcover'])
+                                     columns=['year', 'month', 'day', 'hour', 'State_Encoded', 'humidity', 'pressure', 'windspeedKmph', 'cloudcover'])
         
         # Predicting
         t_pred = model_temp.predict(input_features)[0]
@@ -115,7 +106,7 @@ if st.button("🚀 Generate AI Forecast"):
 
         st.markdown("---")
         
-        # Smart Feedback logic
+        # Smart Feedback
         if r_pred > 0.5:
             st.warning("⚠️ **Precipitation Alert:** High chances of rain. Better to carry an umbrella!")
         else:
